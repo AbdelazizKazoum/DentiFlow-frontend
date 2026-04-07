@@ -20,27 +20,27 @@ _Critical rules and patterns for the dentilflow-frontend monorepo. Focus on unob
 
 ### Frontend (`apps/frontend`)
 
-| Concern | Technology | Notes |
-|---------|-----------|-------|
-| Framework | Next.js 15+ App Router | `src/app/[locale]/` route segments |
-| Language | TypeScript (strict) | No `any` without inline justification comment |
-| Styling | MUI v6 + Tailwind CSS v4 | Hybrid — see rules below |
-| Auth | NextAuth (Auth.js) v4 | JWT strategy + Google OAuth + Credentials |
-| State | Zustand | All state — server data AND client UI state |
-| HTTP client | Axios | Under `infrastructure/api/` only |
-| Real-time | SSE (`EventSource`) | Queue sync via `useQueueSync` hook |
-| i18n | next-intl | `[locale]` route segments; AR/FR/EN |
+| Concern     | Technology               | Notes                                         |
+| ----------- | ------------------------ | --------------------------------------------- |
+| Framework   | Next.js 15+ App Router   | `src/app/[locale]/` route segments            |
+| Language    | TypeScript (strict)      | No `any` without inline justification comment |
+| Styling     | MUI v6 + Tailwind CSS v4 | Hybrid — see rules below                      |
+| Auth        | NextAuth (Auth.js) v4    | JWT strategy + Google OAuth + Credentials     |
+| State       | Zustand                  | All state — server data AND client UI state   |
+| HTTP client | Axios                    | Under `infrastructure/api/` only              |
+| Real-time   | SSE (`EventSource`)      | Queue sync via `useQueueSync` hook            |
+| i18n        | next-intl                | `[locale]` route segments; AR/FR/EN           |
 
 ### Backend (`apps/*-service`)
 
-| Concern | Technology | Notes |
-|---------|-----------|-------|
-| Framework | NestJS + Clean Architecture | Per-service layer structure |
-| ORM | TypeORM Data Mapper mode | Repository + Mapper pattern — no Active Record |
-| Database | MySQL 8.4 LTS | `mysql2` v3.20.0 |
-| Sync comms | gRPC | `grpc-js` v1.14.3 |
-| Async comms | NATS JetStream | `nats` v2.29.3 |
-| Validation | class-validator + class-transformer | On all inbound DTOs |
+| Concern     | Technology                          | Notes                                          |
+| ----------- | ----------------------------------- | ---------------------------------------------- |
+| Framework   | NestJS + Clean Architecture         | Per-service layer structure                    |
+| ORM         | TypeORM Data Mapper mode            | Repository + Mapper pattern — no Active Record |
+| Database    | MySQL 8.4 LTS                       | `mysql2` v3.20.0                               |
+| Sync comms  | gRPC                                | `grpc-js` v1.14.3                              |
+| Async comms | NATS JetStream                      | `nats` v2.29.3                                 |
+| Validation  | class-validator + class-transformer | On all inbound DTOs                            |
 
 ### Monorepo
 
@@ -114,14 +114,23 @@ shared/       → Cross-cutting constants, utils, types
 All REST responses from the API Gateway follow this envelope — agents must never deviate:
 
 **Success:**
+
 ```json
 { "success": true, "data": { ... } }
 { "success": true, "data": [...], "meta": { "page": 1, "limit": 20, "total": 42 } }
 ```
 
 **Error:**
+
 ```json
-{ "success": false, "error": { "code": "SCREAMING_SNAKE_CASE", "message": "Human-readable.", "details": [] } }
+{
+  "success": false,
+  "error": {
+    "code": "SCREAMING_SNAKE_CASE",
+    "message": "Human-readable.",
+    "details": []
+  }
+}
 ```
 
 - `meta` omitted for non-paginated responses.
@@ -188,21 +197,21 @@ src/
 
 ### Naming Conventions
 
-| Artifact | Convention | Example |
-|----------|-----------|---------|
-| TypeScript files | `kebab-case.ts` | `appointment.service.ts` |
-| Classes | `PascalCase` | `AppointmentService` |
-| Functions/variables | `camelCase` | `getAppointmentById` |
-| Constants | `UPPER_SNAKE_CASE` | `MAX_RETRY_COUNT` |
-| Interfaces/types | No `I` prefix | `AppointmentRepository` |
-| DB tables | `plural_snake_case` | `treatment_acts` |
-| DB columns | `snake_case` | `clinic_id`, `created_at` |
-| DB indexes | `idx_{table}_{cols}` | `idx_appointments_clinic_id` |
-| REST routes | `plural-kebab-case` | `/treatment-acts`, `/waiting-room/queue` |
-| REST query params | `camelCase` | `?clinicId=&page=&limit=` |
-| REST versioning | `/api/v1/` prefix | `/api/v1/appointments` |
-| NATS subjects | `service.entity.event` | `queue.status.updated` |
-| gRPC methods | `PascalCase` verb-noun | `CreateAppointment`, `ConfirmTreatmentActs` |
+| Artifact            | Convention             | Example                                     |
+| ------------------- | ---------------------- | ------------------------------------------- |
+| TypeScript files    | `kebab-case.ts`        | `appointment.service.ts`                    |
+| Classes             | `PascalCase`           | `AppointmentService`                        |
+| Functions/variables | `camelCase`            | `getAppointmentById`                        |
+| Constants           | `UPPER_SNAKE_CASE`     | `MAX_RETRY_COUNT`                           |
+| Interfaces/types    | No `I` prefix          | `AppointmentRepository`                     |
+| DB tables           | `plural_snake_case`    | `treatment_acts`                            |
+| DB columns          | `snake_case`           | `clinic_id`, `created_at`                   |
+| DB indexes          | `idx_{table}_{cols}`   | `idx_appointments_clinic_id`                |
+| REST routes         | `plural-kebab-case`    | `/treatment-acts`, `/waiting-room/queue`    |
+| REST query params   | `camelCase`            | `?clinicId=&page=&limit=`                   |
+| REST versioning     | `/api/v1/` prefix      | `/api/v1/appointments`                      |
+| NATS subjects       | `service.entity.event` | `queue.status.updated`                      |
+| gRPC methods        | `PascalCase` verb-noun | `CreateAppointment`, `ConfirmTreatmentActs` |
 
 ### Frontend File Conventions
 
@@ -236,32 +245,38 @@ src/
 ## Anti-Patterns — MUST NOT
 
 **Data access:**
+
 - Never query DB without `clinic_id` filter
 - Never trust `clinic_id` from URL or request headers for authorization
 - Never perform cross-service DB joins
 
 **Frontend architecture:**
+
 - Never call Axios from page/component directly — always through a use-case
 - Never import React, Next.js, or Axios in `domain/` or `application/` layers
 - Never move `src/app/api/auth/[...nextauth]/route.ts` — Next.js discovery breaks
 - Never manage async server data in component-local `useState` — use Zustand store
 
 **API conventions:**
+
 - Never return HTTP `200` with an error body
 - Never return a bare primitive as `data` — always object or array
 - Never use Unix timestamps in API responses or event payloads
 - Never expose gRPC or NATS to external clients
 
 **Backend architecture:**
+
 - Never let TypeORM entities leak outside the infrastructure layer
 - Never throw domain exceptions from controllers or infrastructure
 - Never duplicate `shared-db`, `shared-logger`, or `shared-config` inside a service
 - Never invent new NATS subjects without registering in `packages/shared-events/subjects.ts`
 
 **TypeScript:**
+
 - Never use `any` without an explicit inline justification comment
 
 **RTL/LTR:**
+
 - Never use physical Tailwind utilities (`ml`, `mr`, `pl`, `pr`) in directional layouts
 - Never use `space-x-*` in directional layouts
 
