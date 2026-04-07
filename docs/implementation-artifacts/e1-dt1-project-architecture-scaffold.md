@@ -1,6 +1,6 @@
 # Story E1-DT1: Project Architecture Scaffold
 
-Status: review
+Status: done
 
 > **Dev task — not a user story.** No user-facing value. Excluded from sprint velocity.
 > Purpose: Bootstrap the full monorepo and establish the frontend clean architecture layers that all future stories build upon. There is no meaningful story statement — this is pure technical foundation work.
