@@ -1,0 +1,90 @@
+# generated: 2026-04-07
+# last_updated: 2026-04-07
+# project: dentilflow-frontend
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: docs/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-04-07
+last_updated: 2026-04-07
+project: dentilflow-frontend
+project_key: NOKEY
+tracking_system: file-system
+story_location: docs/implementation-artifacts
+
+development_status:
+  # ─── Epic E1 — Foundation, Auth, and App Shell ───────────────────────────
+  epic-e1: in-progress
+  e1-dt1-project-architecture-scaffold: review
+  e1-s2-locale-rtl-ltr-runtime: backlog
+  e1-s3-auth-session-role-guards: backlog
+  e1-dt2-shared-design-system-primitives: backlog
+  e1-s5-patient-registration-and-consent: backlog
+  epic-e1-retrospective: optional
+
+  # ─── Epic E2 — Appointment Intake and Scheduling ─────────────────────────
+  epic-e2: backlog
+  e2-s1-patient-mobile-booking-flow: backlog
+  e2-s2-secretariat-intake-scheduling-and-appointment-management: backlog
+  e2-s3-conflict-handling-ux: backlog
+  e2-s4-booking-notifications-confirmation-reminder: backlog
+  epic-e2-retrospective: optional
+
+  # ─── Epic E3 — Real-Time Waiting Room and Role Handoffs ──────────────────
+  epic-e3: backlog
+  e3-s1-queue-board-secretary-view: backlog
+  e3-s2-doctor-and-assistant-synchronized-views: backlog
+  e3-s3-reconnect-and-snapshot-resync: backlog
+  epic-e3-retrospective: optional
+
+  # ─── Epic E4 — Clinical Treatment, Checkout, and Balance ─────────────────
+  epic-e4: backlog
+  e4-s1-treatment-act-entry-workflow: backlog
+  e4-s2-doctor-confirmation-gate: backlog
+  e4-s3-checkout-and-partial-payment: backlog
+  epic-e4-retrospective: optional
+
+  # ─── Epic E5 — Admin Configuration and Patient Record Views ──────────────
+  epic-e5: backlog
+  e5-s1-staff-and-role-management-ui: backlog
+  e5-s2-act-catalog-management: backlog
+  e5-s3-patient-profile-and-history-timeline: backlog
+  e5-s4-clinic-configuration-and-admin-dashboard: backlog
+  e5-s5-patient-self-service-portal: backlog
+  epic-e5-retrospective: optional
+
+  # ─── Cross-Epic Non-Functional Stories ───────────────────────────────────
+  epic-nfr: backlog
+  nfr-s1-accessibility-baseline: backlog
+  nfr-s2-localization-quality-gate: backlog
+  nfr-s3-error-and-latency-feedback: backlog
+  epic-nfr-retrospective: optional

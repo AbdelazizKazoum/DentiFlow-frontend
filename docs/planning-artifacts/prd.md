@@ -338,12 +338,13 @@ All role permissions enforced at API layer. UI hides unauthorized actions but AP
 
 ### Integration List
 
-| Integration                | Purpose                          | MVP | Notes                                         |
-| -------------------------- | -------------------------------- | --- | --------------------------------------------- |
-| WhatsApp Business API      | Patient notifications (primary)  | ✅  | Regional provider required (Twilio/360dialog) |
-| Email (SMTP/transactional) | Patient notifications (fallback) | ✅  | SendGrid/Mailgun or equivalent                |
-| EMR/EHR systems            | Clinical data exchange           | ❌  | Post-MVP                                      |
-| Payment gateway            | Online payment processing        | ❌  | Post-MVP                                      |
+| Integration                | Purpose                           | MVP | Notes                                                           |
+| -------------------------- | --------------------------------- | --- | --------------------------------------------------------------- |
+| WhatsApp Business API      | Patient notifications (primary)   | ✅  | Regional provider required (Twilio/360dialog)                   |
+| Email (SMTP/transactional) | Patient notifications (fallback)  | ✅  | SendGrid/Mailgun or equivalent                                  |
+| Google OAuth               | Patient authentication (optional) | ✅  | Via NextAuth v4 Google provider; email/password remains primary |
+| EMR/EHR systems            | Clinical data exchange            | ❌  | Post-MVP                                                        |
+| Payment gateway            | Online payment processing         | ❌  | Post-MVP                                                        |
 
 ### Technical Architecture Considerations
 
@@ -364,8 +365,8 @@ All role permissions enforced at API layer. UI hides unauthorized actions but AP
 
 ### Authentication & User Management
 
-- **FR1:** A visitor can register as a patient with name, phone number, email, and password.
-- **FR2:** A registered user can log in with email and password and receive a JWT access token.
+- **FR1:** A visitor can register as a patient with name, phone number, email, and password — or via Google OAuth (Google account sign-up).
+- **FR2:** A registered user can log in with email and password, or via Google OAuth, and receive a JWT access token.
 - **FR3:** The system enforces role-based access control — Patient, Secretariat, Dental Assistant, Doctor, Admin — at the API layer for every request.
 - **FR4:** An Admin can create staff accounts and assign roles (Secretariat, Dental Assistant, Doctor).
 - **FR5:** An Admin can deactivate or modify staff accounts.
@@ -420,6 +421,7 @@ All role permissions enforced at API layer. UI hides unauthorized actions but AP
 - **FR36:** All user-facing flows are available in Arabic (RTL layout), French, and English.
 - **FR37:** A user can select their preferred language; the UI re-renders with correct directionality (RTL for Arabic, LTR for French/English).
 - **FR38:** Patient registration and consent flows display language-appropriate consent text.
+- **FR42:** The UI supports a light/dark theme toggle; the selected theme persists across sessions and is applied consistently across all role surfaces.
 
 ### Admin & Clinic Configuration
 

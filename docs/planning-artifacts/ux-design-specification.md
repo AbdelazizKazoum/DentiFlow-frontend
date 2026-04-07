@@ -352,9 +352,15 @@ flowchart TD
   B --> C[Click Book Appointment]
   C --> D[Open Appointment Page - clinic already fixed]
   D --> E{Authenticated?}
-  E -- No --> F[Sign in with Google or Email/Password]
-  F --> G[Create account if new patient]
-  G --> H[Return to booking flow]
+  E -- No --> F{Auth method}
+  F -- Email/Password --> F1[Sign in or create account]
+  F -- Google OAuth --> F2[Google sign-in]
+  F1 --> G{New patient?}
+  F2 --> G
+  G -- Yes --> G1[Show consent screen in active locale]
+  G1 --> G2[Patient reads and accepts data consent - AR/FR/EN]
+  G2 --> H[Account created - return to booking flow]
+  G -- No --> H
   E -- Yes --> H[Continue]
   H --> I{Booking mode}
   I -- Choose specific dentist --> J[Select dentist]
@@ -364,9 +370,27 @@ flowchart TD
   L --> M[Select slot]
   M --> N[Confirm patient details]
   N --> O[Review and confirm]
-  O --> P[Booking success]
-  P --> Q[Send WhatsApp/email confirmation]
+  O --> P[Booking success screen]
+  P --> P1[Show BookingConfirmationNotice - notification channel + reference]
+  P1 --> Q[Dispatch WhatsApp primary / email fallback notification]
 ```
+
+**Consent screen design notes (FR38):**
+
+- Displayed immediately after account creation, before returning to booking flow.
+- Consent text is rendered in the active locale (Arabic RTL / French / English).
+- Explicit accept action required — pre-ticked checkboxes are not acceptable under PDPC/CNDP/INPDP.
+- Consent is non-blocking for the booking flow only after acceptance; skipping is not permitted.
+- Copy must be reviewed for legal accuracy per country before commercial launch.
+
+**Notification confirmation design notes (FR13):**
+
+- `BookingConfirmationNotice` component displays on the booking success screen.
+- Shows: appointment reference, date/time, doctor name, and which notification channel was used (WhatsApp or email).
+- If WhatsApp delivery is pending: "A WhatsApp confirmation will arrive shortly."
+- If WhatsApp fails and email fallback is used: "We sent your confirmation to your email address."
+- If both channels fail (graceful degradation): "Your booking is confirmed. Save your reference: [REF]."
+- Tone: calm, reassuring, and explicit — eliminates Yasmine's "did it work?" anxiety moment.
 
 ### Journey 2: Secretariat Queue + Walk-In Intake
 
@@ -405,7 +429,9 @@ flowchart TD
 ### Journey Patterns
 
 - Language context begins at landing page (default FR) and persists across booking.
-- Authentication is required before appointment confirmation, with Google sign-in for low-friction access.
+- Authentication is required before appointment confirmation. Two parallel paths: email/password (primary) and Google OAuth (low-friction alternative).
+- New patient registration triggers the `PatientConsentScreen` — consent is mandatory before proceeding; language context is inherited from the active locale.
+- Booking success always renders `BookingConfirmationNotice` with notification channel confirmation and graceful fallback messaging.
 - Walk-in intake is a first-class secretary workflow.
 - Real-time cross-role synchronization is mandatory across Secretary, Doctor, and Assistant views.
 - Each workflow stage has explicit ownership and handoff signals.
@@ -482,6 +508,35 @@ Using the MUI + Tailwind CSS foundation, leverage standard components for forms,
 **States:** Light, dark, system preference.
 **Accessibility:** Clear toggle labels and state announcements.
 
+### BookingConfirmationNotice
+
+**Purpose:** Communicate post-booking notification status clearly so the patient knows their confirmation was sent and via which channel.
+**Usage:** Booking success screen, immediately after confirmed appointment creation.
+**States:**
+
+- `whatsapp-sent` — "Your WhatsApp confirmation is on its way."
+- `email-fallback` — "We sent your confirmation to your email address."
+- `notification-failed` — "Your booking is confirmed. Save your reference: [REF]."
+- `pending` — "Sending your confirmation..." (brief transient state).
+  **Accessibility:** Role=`status` ARIA live region so screen readers announce the confirmation outcome. Reference number is readable and copyable.
+  **RTL/LTR:** Message text and icon layout must mirror correctly in Arabic.
+
+### PatientConsentScreen
+
+**Purpose:** Present clear, language-appropriate data consent to new patients at registration — satisfying PDPC, CNDP, INPDP, and GDPR obligations.
+**Usage:** Shown once, immediately after account creation, before returning to the booking flow.
+**States:**
+
+- `idle` — Consent text displayed, accept action available.
+- `accepted` — Consent recorded, flow proceeds.
+- `error` — Submission failed, retry available.
+  **Design constraints:**
+- No pre-ticked checkboxes — explicit opt-in only.
+- Consent text rendered in the active locale (AR/FR/EN); locale cannot be changed mid-consent without restarting.
+- Accept button is the primary action; no skip or dismiss option.
+- Scrollable content area for longer legal text with visible scroll indicator.
+  **Accessibility:** Full keyboard navigation; consent text is screen-reader accessible; accept button has explicit aria-label including locale context.
+
 ### Component Implementation Strategy
 
 - Use MUI for complex interactive controls and accessibility-heavy inputs.
@@ -492,11 +547,11 @@ Using the MUI + Tailwind CSS foundation, leverage standard components for forms,
 
 ### Implementation Roadmap
 
-**Phase 1 - Core Booking & Queue:** BookingModeSelector, DentistAvailabilityPanel, ClinicQueueBoard, WalkInQuickIntake.
+**Phase 1 - Core Booking & Queue:** PatientConsentScreen, BookingModeSelector, DentistAvailabilityPanel, BookingConfirmationNotice, ClinicQueueBoard, WalkInQuickIntake, ThemeModeToggle.
 
 **Phase 2 - Clinical & Checkout:** TreatmentActsEditor, CheckoutBalanceSummary.
 
-**Phase 3 - Cross-Cutting UX:** LanguageSwitcher, ThemeModeToggle.
+**Phase 3 - Cross-Cutting UX:** LanguageSwitcher.
 
 ## UX Consistency Patterns
 

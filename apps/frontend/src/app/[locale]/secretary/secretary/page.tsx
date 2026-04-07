@@ -1,0 +1,1 @@
+export default function SecretaryPage() { return <div>Secretary shell</div>; }
