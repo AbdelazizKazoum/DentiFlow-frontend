@@ -4,10 +4,12 @@ inputDocuments:
   - docs/planning-artifacts/product-brief-dentilflow-frontend.md
   - docs/planning-artifacts/prd.md
   - docs/planning-artifacts/ux-design-specification.md
+  - docs/planning-artifacts/epics-and-stories.md
 workflowType: "architecture"
 lastStep: 8
 status: "complete"
 completedAt: "2026-04-07"
+updatedAt: "2026-04-07"
 project_name: "dentilflow-frontend"
 user_name: "Abdelaziz"
 date: "2026-04-07"
@@ -220,6 +222,173 @@ Chosen over MongoDB for DentilFlow because:
   - DB entities ↔ domain entities
   - Domain entities ↔ response DTOs
 - Business use-cases must never depend on TypeORM entities directly
+
+### Database Design (Conceptual + Logical)
+
+#### Conceptual Model (MVP)
+
+DentilFlow MVP data is modeled around one core business flow:
+
+`Patient` → `Appointment` → `Queue Transition` → `Visit/Treatment` → `Checkout/Payment` → `Balance`.
+
+To keep service autonomy and future V2 multi-tenant evolution intact, the conceptual model is split by bounded context:
+
+- **Identity & Access (auth-service):** users, sessions, refresh lifecycle, role claims.
+- **Clinic Configuration (clinic-service):** clinic profile, working hours, staff-role assignment.
+- **Scheduling (appointment-service):** appointments, slot allocation, intake channel metadata.
+- **Waiting Room (queue-service):** queue state machine and transition history.
+- **Clinical Treatment (treatment-service):** procedure catalog, visit treatment acts, doctor confirmation.
+- **Checkout & Financials (checkout-service):** invoices/visit totals, payments, outstanding balances.
+- **Patient Longitudinal View (patient-service):** denormalized patient timeline read model.
+- **Compliance (audit-service):** immutable access and mutation event ledger.
+
+**Core conceptual relationships:**
+
+- One `clinic` has many `users`, `patients`, `appointments`, and `visits`.
+- One `patient` has many `appointments` and many `visits`.
+- One `appointment` maps to zero or one active `queue entry`.
+- One `visit` has many `treatment acts`.
+- One `visit` can have many `payments`.
+- Patient `balance` is the cumulative result of visit totals minus payments.
+
+#### Conceptual ER Diagram (MVP)
+
+```mermaid
+erDiagram
+  CLINIC ||--o{ USER : has
+  CLINIC ||--o{ PATIENT : serves
+  CLINIC ||--o{ APPOINTMENT : schedules
+  CLINIC ||--o{ VISIT : operates
+
+  PATIENT ||--o{ APPOINTMENT : books
+  PATIENT ||--o{ VISIT : attends
+  PATIENT ||--|| PATIENT_BALANCE : has
+
+  APPOINTMENT ||--o| QUEUE_ENTRY : enters
+  QUEUE_ENTRY ||--o{ QUEUE_TRANSITION : records
+
+  APPOINTMENT ||--o| VISIT : becomes
+  VISIT ||--o{ TREATMENT_ACT : includes
+  PROCEDURE_CATALOG ||--o{ TREATMENT_ACT : classifies
+
+  VISIT ||--|| VISIT_CHARGE : totals
+  VISIT ||--o{ PAYMENT : receives
+
+  USER ||--o{ QUEUE_TRANSITION : performs
+  USER ||--o{ TREATMENT_ACT : enters_or_confirms
+  USER ||--o{ PAYMENT : records
+```
+
+Notes:
+
+- Diagram is conceptual and cross-service; physical foreign keys are enforced only within service-owned schemas.
+- `clinic_id` is mandatory on all domain tables even when not shown on every edge.
+
+#### Logical Model (MVP Schema Blueprint)
+
+Each write service owns its schema; logical foreign keys across services are represented by IDs and validated through service contracts (gRPC), not DB joins.
+
+| Service               | Schema            | Primary Tables (MVP)                                                | Notes                             |
+| --------------------- | ----------------- | ------------------------------------------------------------------- | --------------------------------- |
+| `auth-service`        | `auth_db`         | `users`, `user_credentials`, `refresh_tokens`, `auth_outbox`        | JWT identity source of truth      |
+| `clinic-service`      | `clinic_db`       | `clinics`, `clinic_staff`, `working_hours`, `clinic_outbox`         | Clinic config + role binding      |
+| `appointment-service` | `appointment_db`  | `patients`, `appointments`, `slot_locks`, `appointment_outbox`      | Intake + conflict prevention      |
+| `queue-service`       | `queue_db`        | `queue_entries`, `queue_transitions`, `queue_outbox`                | Real-time waiting room state      |
+| `treatment-service`   | `treatment_db`    | `procedure_catalog`, `visits`, `treatment_acts`, `treatment_outbox` | Clinical act lifecycle            |
+| `checkout-service`    | `checkout_db`     | `visit_charges`, `payments`, `patient_balances`, `checkout_outbox`  | Financial closure + carry-forward |
+| `patient-service`     | `patient_read_db` | `patient_profiles`, `patient_timeline_items`                        | Read-optimized longitudinal view  |
+| `audit-service`       | `audit_db`        | `audit_events`                                                      | Append-only immutable ledger      |
+
+#### Entity-Level Logical Definitions
+
+**Global column standards (all domain tables):**
+
+- `id CHAR(36)` (UUID v4, PK)
+- `clinic_id CHAR(36)` (required, indexed)
+- `created_at DATETIME(6)`
+- `updated_at DATETIME(6)`
+- Soft-delete is optional per table (`deleted_at DATETIME(6)` when needed)
+
+**Scheduling and patient intake:**
+
+- `patients`
+  - Unique: `uk_patients_clinic_phone (clinic_id, phone)`
+  - Optional unique: `uk_patients_clinic_email (clinic_id, email)`
+- `appointments`
+  - Key columns: `patient_id`, `doctor_id`, `scheduled_start_at`, `scheduled_end_at`, `intake_channel`, `status`
+  - Status enum: `booked | confirmed | cancelled | no_show | completed`
+  - Indexes:
+    - `idx_appointments_clinic_start (clinic_id, scheduled_start_at)`
+    - `idx_appointments_clinic_doctor_start (clinic_id, doctor_id, scheduled_start_at)`
+    - `idx_appointments_clinic_patient (clinic_id, patient_id)`
+- `slot_locks` (short-lived conflict-guard records)
+  - Unique: `uk_slot_locks_clinic_doctor_range_hash (clinic_id, doctor_id, slot_hash)`
+
+**Queue operations:**
+
+- `queue_entries`
+  - Key columns: `appointment_id`, `patient_id`, `doctor_id`, `current_state`, `entered_at`, `last_transition_at`
+  - State enum: `arrived | waiting | in_chair | done`
+  - Unique: `uk_queue_entries_clinic_appointment (clinic_id, appointment_id)`
+  - Index: `idx_queue_entries_clinic_state_time (clinic_id, current_state, last_transition_at)`
+- `queue_transitions`
+  - Key columns: `queue_entry_id`, `from_state`, `to_state`, `transitioned_by_user_id`, `transitioned_at`
+  - Immutable transition log for operational traceability
+
+**Treatment domain:**
+
+- `procedure_catalog`
+  - Unique: `uk_procedure_catalog_clinic_code (clinic_id, procedure_code)`
+  - Key columns: `name`, `default_price_minor`, `is_active`
+- `visits`
+  - Key columns: `appointment_id`, `patient_id`, `doctor_id`, `started_at`, `closed_at`, `confirmation_status`
+  - Confirmation enum: `draft | pending_doctor_confirmation | confirmed | closed`
+- `treatment_acts`
+  - Key columns: `visit_id`, `tooth_fdi`, `procedure_code`, `unit_price_minor`, `quantity`, `entered_by_user_id`, `confirmed_by_user_id`
+  - Constraint: cannot be billed unless doctor-confirmed
+  - Index: `idx_treatment_acts_clinic_visit (clinic_id, visit_id)`
+
+**Checkout and balances:**
+
+- `visit_charges`
+  - One row per visit closure summary
+  - Key columns: `visit_id`, `subtotal_minor`, `discount_minor`, `total_minor`, `currency`
+  - Unique: `uk_visit_charges_clinic_visit (clinic_id, visit_id)`
+- `payments`
+  - Key columns: `visit_id`, `patient_id`, `amount_minor`, `method`, `recorded_by_user_id`, `recorded_at`
+  - Method enum: `cash | card | transfer | other`
+  - Indexes:
+    - `idx_payments_clinic_patient_time (clinic_id, patient_id, recorded_at)`
+    - `idx_payments_clinic_visit (clinic_id, visit_id)`
+- `patient_balances`
+  - Key columns: `patient_id`, `outstanding_minor`, `last_calculated_at`
+  - Unique: `uk_patient_balances_clinic_patient (clinic_id, patient_id)`
+
+**Audit and event reliability:**
+
+- `*_outbox` tables (one per write service)
+  - Required columns: `event_id`, `aggregate_id`, `event_type`, `payload_json`, `occurred_at`, `published_at`, `retry_count`
+  - `event_id` unique for idempotent publication/consumption
+- `audit_events`
+  - Append-only columns: `event_id`, `clinic_id`, `actor_user_id`, `subject_type`, `subject_id`, `action`, `occurred_at`, `payload_json`
+  - No update/delete operations allowed
+
+#### Logical Integrity Rules (Must Enforce)
+
+- Every query path must include `clinic_id` predicate.
+- No cross-clinic uniqueness constraints; uniqueness is always scoped by `clinic_id`.
+- Queue state transitions must follow allowed graph only:
+  - `arrived → waiting → in_chair → done`
+- `visit` closure requires doctor confirmation of all billable acts.
+- `patient_balances.outstanding_minor` must satisfy:
+  - prior balance + visit totals − payments (never derived from UI values).
+- Outbox event write must be in the same transaction as the domain mutation.
+
+#### Retention and Compliance Notes (MVP)
+
+- Patient-facing and financial records: retained per local legal/compliance policy baseline (configurable retention policy in V2).
+- Audit events: immutable and retained for full compliance horizon.
+- Sensitive payloads in `payload_json` must be minimized and encrypted where applicable.
 
 ---
 
@@ -1298,3 +1467,35 @@ services:
 - Use `.env.dev` for local and `.env.prod` for production; never bake secrets into images.
 - Use `docker-compose.override.yml` for hot-reload/debug-only settings.
 - Production should use prebuilt image tags (`${TAG}`) and immutable deployment inputs.
+
+## Architecture Refresh Addendum (Post-CE Alignment)
+
+This addendum confirms architectural coverage after `CE` artifact creation.
+
+### Input Alignment Verified
+
+- PRD (`docs/planning-artifacts/prd.md`): functional + non-functional baseline
+- UX (`docs/planning-artifacts/ux-design-specification.md`): role-native interaction and RTL/LTR behavior
+- Epics/Stories (`docs/planning-artifacts/epics-and-stories.md`): implementation sequencing and acceptance criteria
+
+### Epic-to-Architecture Traceability
+
+| Epic                               | Architectural Coverage                                                                                  | Status  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------- | ------- |
+| E1 — Foundation/Auth/App Shell     | Next.js App Router layering, NextAuth boundary, JWT claim propagation, i18n + RTL/LTR caches            | Covered |
+| E2 — Appointment Intake/Scheduling | API Gateway REST ingress, appointment-service ownership, conflict-safe workflow via sync RPC            | Covered |
+| E3 — Real-Time Queue/Handoffs      | SSE push, NATS fanout (`queue.status.updated`), reconnect + snapshot resync strategy                    | Covered |
+| E4 — Treatment/Checkout/Balance    | service boundaries for treatment + checkout, ACID-safe persistence with MySQL, outbox event publication | Covered |
+| E5 — Admin/Patient Views           | clinic-service and patient-service ownership, RBAC + `clinic_id` isolation model                        | Covered |
+
+### Architecture Constraints to Enforce During Story Implementation
+
+1. No direct infrastructure calls from page components; UI must use application/infrastructure ports.
+2. `clinic_id` must be token-derived for authorization decisions; URL context is never trusted.
+3. Real-time queue UX must always support reconnect + snapshot reconciliation.
+4. All patient-data access paths must emit immutable audit events.
+5. RTL/LTR parity is a release gate for all role-critical screens.
+
+### Implementation Readiness from Architecture Perspective
+
+With epics/stories now present, architecture remains valid and implementation-sequence-ready. Any future scope change that alters service boundaries, auth claims, or queue state model should trigger a focused architecture delta review.
