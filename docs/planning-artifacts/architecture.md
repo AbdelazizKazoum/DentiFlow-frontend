@@ -1,10 +1,13 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5, 6]
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
 inputDocuments:
   - docs/planning-artifacts/product-brief-dentilflow-frontend.md
   - docs/planning-artifacts/prd.md
   - docs/planning-artifacts/ux-design-specification.md
 workflowType: "architecture"
+lastStep: 8
+status: "complete"
+completedAt: "2026-04-07"
 project_name: "dentilflow-frontend"
 user_name: "Abdelaziz"
 date: "2026-04-07"
@@ -318,22 +321,33 @@ Chosen over MongoDB for DentilFlow because:
 ### Frontend Architecture
 
 - Next.js 15+ App Router + TypeScript
+- Authentication on frontend uses NextAuth v4 (Auth.js v4) with Passport-compatible OAuth providers (Google first)
 - MUI v6 + Tailwind v4 with locked RTL/LTR dual-cache strategy
 - Role-segmented application shells (Patient mobile shell, Staff/Admin dashboard shell)
 - `clinic_id` scope enforced from auth context — never inferred from URL
 - SSE client subscribes to `/events/queue` on API Gateway for real-time queue updates
 - Reconnect + snapshot resync on `EventSource` error/close events
 - i18n via `next-intl` or equivalent for `[locale]` route segment with Arabic RTL + French/English LTR
+- App Router entrypoint remains at `src/app` (framework requirement); clean architecture layers live alongside it
 
 **Frontend Clean Architecture (Required):**
 
 - `domain/`: pure business models, value objects, and domain rules (framework-agnostic)
 - `application/`: use-cases and orchestration logic (no UI framework code)
 - `infrastructure/`: API clients, SSE adapters, storage adapters, mapper implementations
-- `presentation/`: Next.js routes, React components, hooks, view models
+- `presentation/`: React components, hooks, and view models (no routing ownership)
+- `app/`: Next.js App Router adapter layer only (`layout.tsx`, `page.tsx`, route handlers)
 - `shared/`: cross-cutting UI/core helpers (constants, utils, common types)
-- Dependency direction must remain inward (`presentation` -> `application` -> `domain`)
+- Dependency direction must remain inward (`app/presentation` -> `application` -> `domain`)
 - No direct HTTP/SSE calls inside page components; always through application/infrastructure ports
+
+**NextAuth v4 Integration Rules:**
+
+- NextAuth route handler is defined at `src/app/api/auth/[...nextauth]/route.ts`
+- Session strategy: JWT
+- Providers: OAuth (Google first) + Credentials when required
+- NextAuth callbacks map identity/session claims to backend-required claims (`user_id`, `role`, `clinic_id`)
+- NextAuth is the frontend auth boundary; `auth-service` remains source of truth for account lifecycle and token issuance policy
 
 ---
 
@@ -492,6 +506,19 @@ dentiflow/
 
 ```text
 apps/frontend/src/
+├── app/
+│   ├── [locale]/
+│   │   ├── layout.tsx
+│   │   ├── page.tsx
+│   │   ├── patient/
+│   │   ├── secretary/
+│   │   ├── doctor/
+│   │   ├── assistant/
+│   │   └── admin/
+│   └── api/
+│       └── auth/
+│           └── [...nextauth]/
+│               └── route.ts
 ├── domain/
 │   ├── entities/
 │   ├── value-objects/
@@ -507,7 +534,6 @@ apps/frontend/src/
 │   ├── storage/
 │   └── mappers/
 ├── presentation/
-│   ├── app/
 │   ├── components/
 │   ├── hooks/
 │   └── view-models/
@@ -673,6 +699,7 @@ id: {eventId}
 - Duplicate DB/logger/config modules inside each microservice
 - Call API clients directly from page/components without an application use-case
 - Import Next.js/React concerns into frontend `domain` layer
+- Move App Router files out of `src/app` (framework discovery breaks)
 
 ## Project Structure & Boundaries
 
@@ -727,6 +754,19 @@ dentiflow/
 │   │   ├── eslint.config.mjs
 │   │   ├── public/
 │   │   ├── src/
+│   │   │   ├── app/
+│   │   │   │   ├── [locale]/
+│   │   │   │   │   ├── layout.tsx
+│   │   │   │   │   ├── page.tsx
+│   │   │   │   │   ├── patient/
+│   │   │   │   │   ├── secretary/
+│   │   │   │   │   ├── doctor/
+│   │   │   │   │   ├── assistant/
+│   │   │   │   │   └── admin/
+│   │   │   │   └── api/
+│   │   │   │       └── auth/
+│   │   │   │           └── [...nextauth]/
+│   │   │   │               └── route.ts
 │   │   │   ├── domain/
 │   │   │   │   ├── entities/
 │   │   │   │   ├── value-objects/
@@ -742,16 +782,6 @@ dentiflow/
 │   │   │   │   ├── storage/
 │   │   │   │   └── mappers/
 │   │   │   ├── presentation/
-│   │   │   │   ├── app/
-│   │   │   │   │   ├── [locale]/
-│   │   │   │   │   │   ├── layout.tsx
-│   │   │   │   │   │   ├── page.tsx
-│   │   │   │   │   │   ├── patient/
-│   │   │   │   │   │   ├── secretary/
-│   │   │   │   │   │   ├── doctor/
-│   │   │   │   │   │   ├── assistant/
-│   │   │   │   │   │   └── admin/
-│   │   │   │   │   └── api/
 │   │   │   │   ├── components/
 │   │   │   │   ├── hooks/
 │   │   │   │   │   └── useQueueSync.ts
@@ -898,3 +928,373 @@ test/
 - Local development: `docker-compose.yml` + `docker-compose.override.yml`.
 - MVP production deployment: `docker-compose.prod.yml` with hardened images.
 - Post-MVP: CI/CD pipeline under `deploy/ci-cd`, Kubernetes migration deferred.
+
+## Architecture Validation Results
+
+### Coherence Validation ✅
+
+**Decision Compatibility:**
+
+- Frontend and backend decisions are compatible (Next.js App Router + NestJS microservices + gRPC + NATS + MySQL).
+- Realtime model is coherent (NATS domain events + SSE fanout from gateway).
+- Deployment strategy is coherent for MVP (Docker Compose dev/prod), with Kubernetes deferred post-MVP.
+
+**Pattern Consistency:**
+
+- Naming, response, event, layering, and boundary rules are internally consistent.
+- Clean Architecture is defined for both backend and frontend with explicit dependency direction.
+
+**Structure Alignment:**
+
+- Monorepo structure supports the selected boundaries and shared package strategy.
+- Shared modules (`shared-db`, `shared-logger`, `shared-config`) reduce duplication and preserve consistency.
+
+### Requirements Coverage Validation ✅
+
+**Functional Coverage:**
+
+- Core FR domains are architecturally mapped: auth, booking, waiting room, treatment, checkout, records, notifications, admin.
+
+**Non-Functional Coverage:**
+
+- Performance/reliability: realtime sync and reconnect strategy defined.
+- Security/compliance: JWT, Passport strategy model, tenant scoping, audit events, encryption constraints.
+- Scalability: service boundaries and async eventing support post-MVP growth.
+
+### Implementation Readiness Validation ✅
+
+**Decision Completeness:**
+
+- Critical technology choices and integration patterns are documented.
+- Version-aware choices are included for core components.
+
+**Pattern Completeness:**
+
+- High-risk conflict points are covered with enforceable MUST/MUST NOT rules.
+- Repository/mapper and frontend clean-layer patterns are explicitly defined.
+
+**Structure Completeness:**
+
+- Service/package boundaries are concrete and implementation-ready.
+
+### Gap Analysis Results
+
+**Critical gaps:** None.
+
+**Important follow-ups (before implementation sprint starts):**
+
+- Finalize ORM-specific conventions (TypeORM naming strategy + migration naming policy).
+- Finalize NextAuth callback mapping contract with backend claim model.
+- Add canonical NATS subject registry file and review policy.
+
+### Architecture Readiness Assessment
+
+**Overall Status:** READY FOR IMPLEMENTATION
+
+**Confidence Level:** High
+
+## Architecture Completion & Handoff
+
+Excellent work, Abdelaziz — this architecture is now complete and validated.
+
+What we completed together:
+
+- End-to-end architectural decisions for frontend + backend
+- Clean Architecture on both backend and frontend
+- Microservices boundaries with gRPC/NATS contracts
+- Shared cross-service modules and consistency rules for AI agents
+- Docker Compose MVP strategy (dev/prod) with post-MVP evolution path
+
+### Next Steps
+
+1. Use this architecture document as the implementation source of truth.
+2. Start implementation with monorepo scaffolding + shared packages + gateway/auth foundations.
+3. Run `bmad-help` to choose the best next implementation workflow command.
+
+I can now also review this final architecture once more and generate an implementation kickoff checklist if you want.
+
+### Docker Compose Baseline (Dev + Prod)
+
+The following baseline is the reference for running all microservices with MySQL and NATS in Docker Compose.
+
+#### Dev Compose Skeleton (`docker-compose.yml`)
+
+```yaml
+name: dentiflow
+
+networks:
+  dentiflow-net:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  nats_data:
+
+x-common-env: &common-env
+  NODE_ENV: development
+  NATS_URL: nats://nats:4222
+  DB_HOST: mysql
+  DB_PORT: 3306
+  DB_USER: dentiflow
+  DB_PASSWORD: dentiflow
+  DB_NAME: dentiflow
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - dentiflow-net
+  depends_on:
+    mysql:
+      condition: service_healthy
+    nats:
+      condition: service_healthy
+
+services:
+  mysql:
+    image: mysql:8.4
+    command: ["mysqld", "--default-authentication-plugin=mysql_native_password"]
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: dentiflow
+      MYSQL_USER: dentiflow
+      MYSQL_PASSWORD: dentiflow
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - dentiflow-net
+
+  nats:
+    image: nats:2.10
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - dentiflow-net
+
+  api-gateway:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: deploy/docker/gateway.Dockerfile
+    env_file:
+      - .env.dev
+    environment:
+      <<: *common-env
+      SERVICE_NAME: api-gateway
+      PORT: 3001
+    ports:
+      - "3001:3001"
+
+  auth-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: deploy/docker/auth-service.Dockerfile
+    env_file:
+      - .env.dev
+    environment:
+      <<: *common-env
+      SERVICE_NAME: auth-service
+
+  clinic-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: deploy/docker/clinic-service.Dockerfile
+    env_file:
+      - .env.dev
+    environment:
+      <<: *common-env
+      SERVICE_NAME: clinic-service
+
+  appointment-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: deploy/docker/appointment-service.Dockerfile
+    env_file:
+      - .env.dev
+    environment:
+      <<: *common-env
+      SERVICE_NAME: appointment-service
+
+  queue-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: deploy/docker/queue-service.Dockerfile
+    env_file:
+      - .env.dev
+    environment:
+      <<: *common-env
+      SERVICE_NAME: queue-service
+
+  treatment-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: deploy/docker/treatment-service.Dockerfile
+    env_file:
+      - .env.dev
+    environment:
+      <<: *common-env
+      SERVICE_NAME: treatment-service
+
+  checkout-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: deploy/docker/checkout-service.Dockerfile
+    env_file:
+      - .env.dev
+    environment:
+      <<: *common-env
+      SERVICE_NAME: checkout-service
+
+  patient-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: deploy/docker/patient-service.Dockerfile
+    env_file:
+      - .env.dev
+    environment:
+      <<: *common-env
+      SERVICE_NAME: patient-service
+
+  notification-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: deploy/docker/notification-service.Dockerfile
+    env_file:
+      - .env.dev
+    environment:
+      <<: *common-env
+      SERVICE_NAME: notification-service
+
+  audit-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: deploy/docker/audit-service.Dockerfile
+    env_file:
+      - .env.dev
+    environment:
+      <<: *common-env
+      SERVICE_NAME: audit-service
+
+  frontend:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: deploy/docker/frontend.Dockerfile
+    env_file:
+      - .env.dev
+    environment:
+      NODE_ENV: development
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: change-me
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      api-gateway:
+        condition: service_started
+    networks:
+      - dentiflow-net
+```
+
+#### Prod Compose Skeleton (`docker-compose.prod.yml`)
+
+```yaml
+name: dentiflow
+
+networks:
+  dentiflow-net:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  nats_data:
+
+services:
+  mysql:
+    image: mysql:8.4
+    env_file: [.env.prod]
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-uroot",
+          "-p${MYSQL_ROOT_PASSWORD}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks: [dentiflow-net]
+
+  nats:
+    image: nats:2.10
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    volumes: ["nats_data:/data"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks: [dentiflow-net]
+
+  api-gateway:
+    image: ghcr.io/your-org/dentiflow/api-gateway:${TAG}
+    env_file: [.env.prod]
+    depends_on:
+      mysql: { condition: service_healthy }
+      nats: { condition: service_healthy }
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+    networks: [dentiflow-net]
+
+  frontend:
+    image: ghcr.io/your-org/dentiflow/frontend:${TAG}
+    env_file: [.env.prod]
+    depends_on:
+      api-gateway: { condition: service_started }
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    networks: [dentiflow-net]
+```
+
+#### Compose Operational Rules
+
+- Use service DNS names (`mysql`, `nats`, `api-gateway`, etc.) in all internal URLs.
+- Add migrations as startup step per service (or a dedicated migration service) before serving traffic.
+- Keep only `frontend` and `api-gateway` exposed externally.
+- Use `.env.dev` for local and `.env.prod` for production; never bake secrets into images.
+- Use `docker-compose.override.yml` for hot-reload/debug-only settings.
+- Production should use prebuilt image tags (`${TAG}`) and immutable deployment inputs.
