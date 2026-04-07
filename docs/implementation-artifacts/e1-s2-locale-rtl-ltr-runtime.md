@@ -1,6 +1,6 @@
 # Story E1.S2: locale-rtl-ltr-runtime
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -32,6 +32,11 @@ so that I get the correct layout direction and formatting for my language.
 - [x] Ensure formatting utility implementations (AC: 4)
   - [x] Implement locale-aware date/time formatting functions
   - [x] Implement locale-aware number/currency formatting functions
+
+### Review Findings
+
+- [x] [Review][Patch] Tailwind RTL configuration missing — Tailwind v4 has built-in RTL support, no config needed
+- [x] [Review][Patch] No error handling for invalid date inputs [formatters.ts] — Added try-catch with fallback
 
 ## Dev Notes
 
@@ -66,7 +71,8 @@ Gemini 3.1 Pro (Preview)
 - Implemented `next-intl` configuration and middleware handling for `ar`, `fr`, and `en` with proper redirection rules.
 - Set document `lang` and `dir="rtl"` in HTML tags and integrated `EmotionRegistry` from MUI utilizing `stylis-plugin-rtl` for conditional Arabic direction formatting.
 - Integrated `AppThemeProvider` with zero-config Tailwind v4 RTL/LTR logical classes.
-- Created `formatters.ts` with custom wrappers leveraging `Intl.NumberFormat` and `Intl.DateTimeFormat` for localization accuracy (DZD currency and localized parsing support).
+- Created `formatters.ts` with custom wrappers leveraging `Intl.NumberFormat` and `Intl.DateTimeFormat` for localization accuracy (DZD currency and localized parsing support).- Code review completed: 2 patch findings addressed (Tailwind RTL built-in, error handling added to formatters).
+- Status updated to done.
 
 ### File List
 

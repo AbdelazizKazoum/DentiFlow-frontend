@@ -45,7 +45,7 @@ development_status:
   # ─── Epic E1 — Foundation, Auth, and App Shell ───────────────────────────
   epic-e1: in-progress
   e1-dt1-project-architecture-scaffold: done
-  e1-s2-locale-rtl-ltr-runtime: review
+  e1-s2-locale-rtl-ltr-runtime: done
   e1-s3-auth-session-role-guards: backlog
   e1-dt2-shared-design-system-primitives: backlog
   e1-s5-patient-registration-and-consent: backlog
