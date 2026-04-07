@@ -1,6 +1,11 @@
 # Story E1.S2: locale-rtl-ltr-runtime
 
+<<<<<<< HEAD
 Status: done
+=======
+Status: review
+
+> > > > > > > 254b24b0310c3248283605c9b7711fae4c68148d
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
