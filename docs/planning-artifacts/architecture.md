@@ -325,6 +325,16 @@ Chosen over MongoDB for DentilFlow because:
 - Reconnect + snapshot resync on `EventSource` error/close events
 - i18n via `next-intl` or equivalent for `[locale]` route segment with Arabic RTL + French/English LTR
 
+**Frontend Clean Architecture (Required):**
+
+- `domain/`: pure business models, value objects, and domain rules (framework-agnostic)
+- `application/`: use-cases and orchestration logic (no UI framework code)
+- `infrastructure/`: API clients, SSE adapters, storage adapters, mapper implementations
+- `presentation/`: Next.js routes, React components, hooks, view models
+- `shared/`: cross-cutting UI/core helpers (constants, utils, common types)
+- Dependency direction must remain inward (`presentation` -> `application` -> `domain`)
+- No direct HTTP/SSE calls inside page components; always through application/infrastructure ports
+
 ---
 
 ### Infrastructure & Deployment
@@ -478,6 +488,35 @@ dentiflow/
   docker-compose.override.yml
 ```
 
+**Frontend Internal Structure (Clean Architecture):**
+
+```text
+apps/frontend/src/
+├── domain/
+│   ├── entities/
+│   ├── value-objects/
+│   └── services/
+├── application/
+│   ├── use-cases/
+│   ├── ports/
+│   └── dto/
+├── infrastructure/
+│   ├── api/
+│   ├── sse/
+│   ├── auth/
+│   ├── storage/
+│   └── mappers/
+├── presentation/
+│   ├── app/
+│   ├── components/
+│   ├── hooks/
+│   └── view-models/
+└── shared/
+    ├── constants/
+    ├── utils/
+    └── types/
+```
+
 **Shared Module Reuse Rule:**
 
 - DB, logger, and config modules are shared packages and imported by all microservices
@@ -594,6 +633,13 @@ id: {eventId}
 - TypeORM entities are infrastructure-only and must not leak into use-case/application layers
 - Mapper naming convention: `{Domain}PersistenceMapper` and `{Domain}ResponseMapper`
 
+**Frontend Application Pattern:**
+
+- UI components/pages must call application use-cases, not raw API clients
+- API/SSE clients are only allowed under `infrastructure/`
+- UI-facing transformations use mapper/view-model adapters under `presentation/` and `infrastructure/mappers`
+- Domain entities must never import React/Next.js types
+
 ---
 
 ### Enforcement Rules for All AI Agents
@@ -611,6 +657,8 @@ id: {eventId}
 - Reuse shared `shared-db`, `shared-logger`, and `shared-config` modules across all services
 - Implement all DB access via Repository + Mapper patterns (TypeORM Data Mapper mode)
 - Use Passport.js strategies for auth flows (Local/JWT/OAuth)
+- Apply Clean Architecture layers in frontend (`domain`, `application`, `infrastructure`, `presentation`, `shared`)
+- Keep frontend dependency direction inward and framework-free in `domain` and `application`
 
 **MUST NOT:**
 
@@ -623,6 +671,8 @@ id: {eventId}
 - Store timezone-aware dates in the DB — always persist UTC
 - Expose TypeORM entities outside infrastructure layer
 - Duplicate DB/logger/config modules inside each microservice
+- Call API clients directly from page/components without an application use-case
+- Import Next.js/React concerns into frontend `domain` layer
 
 ## Project Structure & Boundaries
 
@@ -677,24 +727,41 @@ dentiflow/
 │   │   ├── eslint.config.mjs
 │   │   ├── public/
 │   │   ├── src/
-│   │   │   ├── app/
-│   │   │   │   ├── [locale]/
-│   │   │   │   │   ├── layout.tsx
-│   │   │   │   │   ├── page.tsx
-│   │   │   │   │   ├── patient/
-│   │   │   │   │   ├── secretary/
-│   │   │   │   │   ├── doctor/
-│   │   │   │   │   ├── assistant/
-│   │   │   │   │   └── admin/
-│   │   │   │   └── api/
-│   │   │   ├── components/
-│   │   │   ├── features/
-│   │   │   ├── hooks/
-│   │   │   │   └── useQueueSync.ts
-│   │   │   ├── lib/
-│   │   │   ├── i18n/
-│   │   │   ├── styles/
-│   │   │   └── types/
+│   │   │   ├── domain/
+│   │   │   │   ├── entities/
+│   │   │   │   ├── value-objects/
+│   │   │   │   └── services/
+│   │   │   ├── application/
+│   │   │   │   ├── use-cases/
+│   │   │   │   ├── ports/
+│   │   │   │   └── dto/
+│   │   │   ├── infrastructure/
+│   │   │   │   ├── api/
+│   │   │   │   ├── sse/
+│   │   │   │   ├── auth/
+│   │   │   │   ├── storage/
+│   │   │   │   └── mappers/
+│   │   │   ├── presentation/
+│   │   │   │   ├── app/
+│   │   │   │   │   ├── [locale]/
+│   │   │   │   │   │   ├── layout.tsx
+│   │   │   │   │   │   ├── page.tsx
+│   │   │   │   │   │   ├── patient/
+│   │   │   │   │   │   ├── secretary/
+│   │   │   │   │   │   ├── doctor/
+│   │   │   │   │   │   ├── assistant/
+│   │   │   │   │   │   └── admin/
+│   │   │   │   │   └── api/
+│   │   │   │   ├── components/
+│   │   │   │   ├── hooks/
+│   │   │   │   │   └── useQueueSync.ts
+│   │   │   │   └── view-models/
+│   │   │   └── shared/
+│   │   │       ├── constants/
+│   │   │       ├── utils/
+│   │   │       ├── styles/
+│   │   │       ├── i18n/
+│   │   │       └── types/
 │   │   └── test/
 │   │       ├── unit/
 │   │       ├── integration/
